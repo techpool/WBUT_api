@@ -10,8 +10,8 @@ app.use(express.static('public'));
 
 var rectype = 1;
 
-var semno = 4;
-var rollno = 25300113035;
+var semno = 3;
+var rollno = 253001130475;
 
 var headerData = {};
 
@@ -27,7 +27,7 @@ async.forever(
         function (callback) {
               request({
                   method: 'POST',
-                  uri: 'http://www.wbutech.net/show-result_even.php',
+                  uri: 'http://www.wbutech.net/show-result.php',
                   headers:
                     {
                       'Host': 'www.wbutech.net',
@@ -45,6 +45,7 @@ async.forever(
                   ,
                   body: 'semno='+ semno +'&rectype=' + rectype + '&rollno=' + rollno
               }, function (err, res, body) {
+                if (res) {
                   if (res.statusCode == 200) {
                       console.log("All on good track!");
                       callback(null);
@@ -53,6 +54,10 @@ async.forever(
                       console.log("Refreshing! Please wait");
                       foreverCallBack(null);
                   }
+                } else {
+                  console.log("Refreshing! Please wait");
+                  foreverCallBack(null);
+                }
               }).pipe(gunzip);;
         },
         function (callback) {
