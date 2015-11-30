@@ -6,12 +6,19 @@ var zlib = require('zlib');
 var async = require('async');
 var fs = require('fs');
 
+var raven = require('raven');
+var client = new raven.Client('https://99a165507ad14a559c42e54fb5e7a20c:a219754a82bc43b4a0a6813b02de3b87@app.getsentry.com/58063', {
+  release : '2.3.5.6'
+})
+client.patchGlobal();
+client.captureError('Hello Testing 3');
+
 app.use(express.static('public'));
 
 var rectype = 1;
 
 var semno = 3;
-var rollno = 253001130475;
+var rollno = 25300113047;
 
 var headerData = {};
 
