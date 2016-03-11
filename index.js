@@ -1,109 +1,105 @@
-var request = require('request');
-var request = request.defaults({jar: true})
 var express = require('express');
 var app = express();
-var zlib = require('zlib');
 var async = require('async');
 var fs = require('fs');
 
-var raven = require('raven');
-var client = new raven.Client('https://99a165507ad14a559c42e54fb5e7a20c:a219754a82bc43b4a0a6813b02de3b87@app.getsentry.com/58063', {
-  release : '2.3.5.6'
-})
-client.patchGlobal();
-client.captureError('Hello Testing 3');
+var http = require('http');
+var querystring = require('querystring');
 
-app.use(express.static('public'));
 
 var rectype = 1;
 
-var semno = 3;
+var semno = 4;
 var rollno = 25300113047;
 
-var headerData = {};
-
-var buffer = [];
-var gunzip = zlib.createGunzip();
-
-
-
 async.forever(
-  function (foreverCallBack) {
+    function(foreverCallBack) {
 
-      async.waterfall([
-        function (callback) {
-              request({
-                  method: 'POST',
-                  uri: 'http://www.wbutech.net/show-result.php',
-                  headers:
-                    {
-                      'Host': 'www.wbutech.net',
-                      'Connection': 'keep-alive',
-                      'Cache-Control': 'max-age=0',
-                      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                      'Origin': 'http://www.wbutech.net',
-                      'Upgrade-Insecure-Requests': '1',
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36',
-                      'Content-Type': 'application/x-www-form-urlencoded',
-                      'Referer': 'http://www.wbutech.net/result_even.php',
-                      'Accept-Encoding': 'gzip, deflate',
-                      'Accept-Language': 'en-US,en;q=0.8,en-GB;q=0.6',
+        async.waterfall([
+            function(callback) {
+                var postData = querystring.stringify({
+                    'semno': semno,
+                    'rectype': rectype,
+                    'rollno': rollno
+                });
+
+                var options = {
+                    hostname: 'www.wbutech.net',
+                    port: 80,
+                    path: '/show-result.php',
+                    method: 'POST',
+                    headers: {
+                        'Host': 'www.wbutech.net',
+                        'Connection': 'keep-alive',
+                        'Cache-Control': 'max-age=0',
+                        'Content-Length': '36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Origin': 'http://www.wbutech.net',
+                        'Upgrade-Insecure-Requests': '1',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/46.0.2490.71 Safari/537.36',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Referer': 'http://www.wbutech.net/result_even.php',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Accept-Language': 'en-US,en;q=0.8,en-GB;q=0.6'
                     }
-                  ,
-                  body: 'semno='+ semno +'&rectype=' + rectype + '&rollno=' + rollno
-              }, function (err, res, body) {
-                if (res) {
-                  if (res.statusCode == 200) {
-                      console.log("All on good track!");
-                      callback(null);
-                  } else {
-                      console.log("Status Code: " + res.statusCode);
-                      console.log("Refreshing! Please wait");
-                      foreverCallBack(null);
-                  }
-                } else {
-                  console.log("Refreshing! Please wait");
-                  foreverCallBack(null);
-                }
-              }).pipe(gunzip);;
-        },
-        function (callback) {
-          gunzip.on('data', function(data) {
-              buffer.push(data.toString())
-          }).on("end", function() {
-              // response and decompression complete, join the buffer and return
-              buffer = buffer.join(" ");
-              console.log("Done");
-              callback(null);
-          }).on("error", function(e) {
-                foreverCallBack(e);
-          });
-        },
-        function (callback) {
-          var fileName = './public/results/' + rollno + '.html';
-          fs.writeFile(fileName, buffer, function (err) {
-            if (err) {
-              console.log('Error writing file: ' + err);
-            } else {
-              console.log('Data written to file: ' + fileName + ' successfully!');
+                };
+
+                var req = http.request(options, (res) => {
+                    if (res.statusCode == 200) {
+                        console.log(`STATUS: ${res.statusCode}`);
+                        console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
+                        res.setEncoding('utf8');
+                        var data = '';
+                        res.on('data', function(chunk) {
+                            data += chunk
+                        });
+                        res.on('end', () => {
+                            var fileName = rollno + '_semno' + semno + '.html';
+                            fs.writeFile(fileName, data, function(err) {
+                                if (err) {
+                                    console.log('Error writing file: ' + err);
+                                } else {
+                                    console.log('Data written to file: ' + fileName + ' successfully!');
+                                }
+                            })
+                            console.log('No more data in response.')
+                        })
+                    } else {
+                        console.log('here')
+                        foreverCallBack(null);
+                    }
+                });
+
+                req.on('socket', function (socket) {
+                    socket.setTimeout(3000);  
+                    socket.on('timeout', function() {
+                        req.abort();
+                    });
+                });
+
+                req.on('error', (e) => {
+                    console.log(e)
+                    console.log(`problem with request: ${e.message}`);
+                    foreverCallBack(null);
+                });
+
+                req.write(postData);
+                req.end();
             }
-          })
-        }
-      ], function (err) {
+        ], function(err) {
+            console.log(err);
+        })
+    },
+    function(err) {
         console.log(err);
-      })
-  },
-  function (err) {
-    console.log(err);
-    //forever loop error handling
-  }
+    }
 );
 
 
-app.get('/', function (request, response) {
-  response.send('Hey There!');
+app.get('/', function(request, response) {
+    response.send('Hey There!');
 });
 
-app.listen(4000, function (err) {
-  console.log("Server is listening on: 4000 port");
+app.listen(4000, function(err) {
+    console.log("Server is listening on: 4000 port");
 });
